@@ -1,4 +1,4 @@
-package org.alternadev.pedestrians.org.alternadev.pedestrians.api;
+package org.alternadev.pedestrians.api;
 
 import java.util.List;
 

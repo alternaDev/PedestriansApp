@@ -1,13 +1,11 @@
-package org.alternadev.pedestrians.org.alternadev.pedestrians.api;
+package org.alternadev.pedestrians.api;
 
 import android.content.Context;
 import android.os.AsyncTask;
-import android.support.annotation.Nullable;
 
 import org.alternadev.pedestrians.MainActivity;
-import org.alternadev.pedestrians.org.alternadev.pedestrians.db.PedestrianImage;
+import org.alternadev.pedestrians.db.PedestrianImage;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

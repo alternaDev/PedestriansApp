@@ -1,4 +1,4 @@
-package org.alternadev.pedestrians.org.alternadev.pedestrians.db;
+package org.alternadev.pedestrians.db;
 
 import com.orm.SugarRecord;
 

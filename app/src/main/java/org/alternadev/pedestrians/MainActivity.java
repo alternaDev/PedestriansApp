@@ -8,7 +8,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.TransitionDrawable;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -18,16 +17,15 @@ import android.text.InputType;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.facebook.stetho.Stetho;
 
-import org.alternadev.pedestrians.org.alternadev.pedestrians.api.PedestrianAPIController;
-import org.alternadev.pedestrians.org.alternadev.pedestrians.db.Pedestrian;
-import org.alternadev.pedestrians.org.alternadev.pedestrians.db.PedestrianImage;
+import org.alternadev.pedestrians.api.PedestrianAPIController;
+import org.alternadev.pedestrians.db.Pedestrian;
+import org.alternadev.pedestrians.db.PedestrianImage;
 
 import java.util.ArrayList;
 import java.util.Iterator;

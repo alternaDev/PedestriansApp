@@ -1,4 +1,4 @@
-package org.alternadev.pedestrians.org.alternadev.pedestrians.api;
+package org.alternadev.pedestrians.api;
 
 /**
  * Created by Julius on 29.06.2017.

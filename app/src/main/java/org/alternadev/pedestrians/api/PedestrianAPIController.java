@@ -1,4 +1,4 @@
-package org.alternadev.pedestrians.org.alternadev.pedestrians.api;
+package org.alternadev.pedestrians.api;
 
 import android.content.Context;
 
@@ -6,14 +6,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import org.alternadev.pedestrians.MainActivity;
-import org.alternadev.pedestrians.org.alternadev.pedestrians.db.Pedestrian;
-import org.alternadev.pedestrians.org.alternadev.pedestrians.db.PedestrianImage;
+import org.alternadev.pedestrians.db.Pedestrian;
+import org.alternadev.pedestrians.db.PedestrianImage;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import okhttp3.HttpUrl;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
