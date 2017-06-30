@@ -178,9 +178,9 @@ public class MainActivity extends AppCompatActivity {
                                         @Override
                                         public void onClick(DialogInterface dialog, int which) {
                                             if(coming.isChecked())
-                                                workingOn.setStatus("arriving");
-                                            else
                                                 workingOn.setStatus("leaving");
+                                            else
+                                                workingOn.setStatus("arriving");
                                             workingOn.save();
                                             MainActivity.this.nextPicture();
                                         }
@@ -219,9 +219,9 @@ public class MainActivity extends AppCompatActivity {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     if(coming.isChecked())
-                                        workingOn.setStatus("arriving");
-                                    else
                                         workingOn.setStatus("leaving");
+                                    else
+                                        workingOn.setStatus("arriving");
                                     workingOn.save();
                                     MainActivity.this.nextPicture();
                                 }

@@ -7,6 +7,16 @@ package org.alternadev.pedestrians.api;
 public class PedestrianResult {
     private String fileName;
     private String recognizedPedestrian;
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    private String status;
     private boolean isPedestrian;
 
     public boolean isPedestrian() {

@@ -77,11 +77,13 @@ public class PedestrianImage extends SugarRecord<PedestrianImage>{
         this.noPedestrian = false;
     }
 
-    public PedestrianImage(String name, boolean alreadyAnalyzed, boolean noPedestrian, Pedestrian pedestrian, String path){
+    public PedestrianImage(String name, boolean alreadyAnalyzed, boolean noPedestrian, Pedestrian pedestrian, Pedestrian suggestion, String path, String status){
         this.alreadyAnalyzed = alreadyAnalyzed;
         this.name = name;
         this.noPedestrian = noPedestrian;
         this.pedestrian = pedestrian;
         this.path = path;
+        this.status = status;
+        this.suggestion = suggestion;
     }
 }

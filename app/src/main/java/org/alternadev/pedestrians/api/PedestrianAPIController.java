@@ -161,6 +161,7 @@ public class PedestrianAPIController {
                 String fileName = pi.getPath().substring(pi.getPath().lastIndexOf('/')+1, pi.getPath().length() );
                 r.setFileName(fileName);
                 r.setPedestrian(!pi.isNoPedestrian());
+                r.setStatus(pi.getStatus());
                 if(pi.getPedestrian() != null)
                     r.setRecognizedPedestrian(pi.getPedestrian().getName());
                 results.add(r);
