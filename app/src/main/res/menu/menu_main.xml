@@ -4,12 +4,13 @@
     tools:context="org.alternadev.pedestrians.MainActivity">
     <item
     android:id="@+id/fetch_data"
-    android:orderInCategory="100"
+    android:orderInCategory="101"
     android:title="Fetch Data"
     app:showAsAction="never" />
+
     <item
         android:id="@+id/send_data"
-        android:orderInCategory="100"
+        android:orderInCategory="101"
         android:title="Send Data"
         app:showAsAction="never" />
 </menu>

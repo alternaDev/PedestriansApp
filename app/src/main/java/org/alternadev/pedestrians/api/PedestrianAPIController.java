@@ -24,7 +24,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
  */
 
 public class PedestrianAPIController {
-    static final String BASE_URL = "http://192.168.178.77:8080/";
+    static final String BASE_URL = "http://192.168.178.75:8080/";
     private Context context;
 
     public PedestrianAPIController(Context c) {
@@ -147,6 +147,7 @@ public class PedestrianAPIController {
                     .build();
 
             PedestrianAPI pedestrianAPI = retrofit.create(PedestrianAPI.class);
+
             Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
             ArrayList<PedestrianImage> list = new ArrayList<PedestrianImage>();
             while(it.hasNext()){

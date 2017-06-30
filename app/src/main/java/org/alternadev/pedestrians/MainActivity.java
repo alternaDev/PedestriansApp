@@ -19,6 +19,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import com.facebook.stetho.Stetho;
@@ -37,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private ImageView imageView;
     private FloatingActionButton delete;
     private FloatingActionButton assign;
+    private FloatingActionButton skip;
 
     private ArrayList<PedestrianImage> images;
     private PedestrianImage current;
@@ -61,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
         imageView = (ImageView) findViewById(R.id.imageView2);
         delete = (FloatingActionButton) findViewById(R.id.delete);
         assign = (FloatingActionButton) findViewById(R.id.assign);
+        skip = (FloatingActionButton) findViewById(R.id.skip);
 
         this.loadImages();
         this.nextPicture();
@@ -98,7 +102,13 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
+        skip.setOnClickListener(new View.OnClickListener(){
 
+            @Override
+            public void onClick(View v) {
+                MainActivity.this.skip();
+            }
+        });
 
         delete.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -136,6 +146,7 @@ public class MainActivity extends AppCompatActivity {
                 builder.setItems(names, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
+
                         if (which == all.size()) {
                             AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
                             builder.setTitle("Neue Person hinzufügen:");
@@ -156,8 +167,33 @@ public class MainActivity extends AppCompatActivity {
 
                                     workingOn.setPedestrian(newPedestrian);
                                     workingOn.setAlreadyAnalyzed(true);
-                                    workingOn.save();
-                                    MainActivity.this.nextPicture();
+
+                                    AlertDialog.Builder builder2 = new AlertDialog.Builder(MainActivity.this);
+                                    builder2.setTitle("");
+                                    View layout = View.inflate(MainActivity.this,R.layout.select_state, null);
+                                    builder2.setView(layout);
+                                    final RadioButton coming = (RadioButton) layout.findViewById(R.id.radioButton);
+
+                                    builder2.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            if(coming.isChecked())
+                                                workingOn.setStatus("arriving");
+                                            else
+                                                workingOn.setStatus("leaving");
+                                            workingOn.save();
+                                            MainActivity.this.nextPicture();
+                                        }
+                                    });
+                                    builder2.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            dialog.cancel();
+                                        }
+                                    });
+
+                                    builder2.show();
+
                                 }
                             });
                             builder.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
@@ -172,9 +208,36 @@ public class MainActivity extends AppCompatActivity {
                             Pedestrian selected = all.get(which);
                             workingOn.setPedestrian(selected);
                             workingOn.setAlreadyAnalyzed(true);
-                            workingOn.save();
-                            MainActivity.this.nextPicture();
+
+                            AlertDialog.Builder builder2 = new AlertDialog.Builder(MainActivity.this);
+                            builder2.setTitle("");
+                            View layout = View.inflate(MainActivity.this,R.layout.select_state, null);
+                            builder2.setView(layout);
+                            final RadioButton coming = (RadioButton) layout.findViewById(R.id.radioButton);
+
+                            builder2.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    if(coming.isChecked())
+                                        workingOn.setStatus("arriving");
+                                    else
+                                        workingOn.setStatus("leaving");
+                                    workingOn.save();
+                                    MainActivity.this.nextPicture();
+                                }
+                            });
+                            builder2.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.cancel();
+                                }
+                            });
+                            builder2.show();
+
+
                         }
+
+
 
                     }
                 });
@@ -193,36 +256,76 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void nextPicture() {
-        MainActivity.this.images.remove(current);
+        this.images.remove(current);
         TextView noImages = (TextView) findViewById(R.id.textView);
+        TextView suggestion = (TextView) findViewById(R.id.suggestion);
         if (this.images.size() == 0) {
             this.imageView.setVisibility(View.INVISIBLE);
             noImages.setVisibility(View.VISIBLE);
             assign.setVisibility(View.INVISIBLE);
             delete.setVisibility(View.INVISIBLE);
+            suggestion.setVisibility(View.INVISIBLE);
+            skip.setVisibility(View.INVISIBLE);
+
         } else {
+            skip.setVisibility(View.VISIBLE);
+            suggestion.setVisibility(View.VISIBLE);
             noImages.setVisibility(View.INVISIBLE);
             this.imageView.setVisibility(View.VISIBLE);
             assign.setVisibility(View.VISIBLE);
             delete.setVisibility(View.VISIBLE);
 
-
             this.current = this.images.get(0);
+            if(this.current.getSuggestion() != null)
+                suggestion.setText("Ist das möglicherweise "+this.current.getSuggestion().getName() +"?");
+            else
+                suggestion.setText("Kein Vorschlag vorhanden.");
             imageView.setImageDrawable( getDrawableFromPath(current.getPath()));
 
 
         }
     }
 
+    public void skip(){
+        if(this.images.size() > 1) {
+            this.images.remove(current);
+            this.images.add(current);
+            this.current = this.images.get(0);
+            this.imageView.setImageDrawable(getDrawableFromPath(current.getPath()));
+        } else {
+            Snackbar.make(this.imageView, "Keine andere Bilder vorhanden.", Snackbar.LENGTH_LONG)
+                    .setAction("Action", null).show();
+        }
+    }
+
     private Drawable getDrawableFromPath(String path) {
         Bitmap bmImg = BitmapFactory.decodeFile(path);
         Drawable result = new BitmapDrawable(getApplicationContext().getResources(), bmImg);
-        return result;
+        return scaleImage(result,2f);
+    }
+    private Drawable scaleImage (Drawable image, float scaleFactor) {
+
+        if ((image == null) || !(image instanceof BitmapDrawable)) {
+            return image;
+        }
+
+        Bitmap b = ((BitmapDrawable)image).getBitmap();
+
+        int sizeX = Math.round(image.getIntrinsicWidth() * scaleFactor);
+        int sizeY = Math.round(image.getIntrinsicHeight() * scaleFactor);
+
+        Bitmap bitmapResized = Bitmap.createScaledBitmap(b, sizeX, sizeY, false);
+
+        image = new BitmapDrawable(getResources(), bitmapResized);
+
+        return image;
+
     }
 
     public void loadImages() {
+
         this.images = new ArrayList<PedestrianImage>();
-        Iterator<PedestrianImage> it = findAll(PedestrianImage.class);
+        Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
         while (it.hasNext()) {
             PedestrianImage next = it.next();
             if (!next.isAlreadyAnalyzed())
@@ -241,8 +344,11 @@ public class MainActivity extends AppCompatActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.fetch_data) {
-            controller.fetchImages();
+            Pedestrian.deleteAll(Pedestrian.class);
+            PedestrianImage.deleteAll(PedestrianImage.class);
             controller.getNames();
+            controller.fetchImages();
+
             return true;
         } else if (id == R.id.send_data) {
             controller.sendResults();

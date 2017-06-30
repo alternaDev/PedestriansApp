@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.AsyncTask;
 
 import org.alternadev.pedestrians.MainActivity;
+import org.alternadev.pedestrians.db.Pedestrian;
 import org.alternadev.pedestrians.db.PedestrianImage;
 
 import java.io.IOException;
@@ -20,6 +21,7 @@ import java.util.Iterator;
 
 public class ImageServerLocation {
     String url;
+    String otherSuggestion;
 
     public ImageServerLocation(String s) {
         this.url = s;
@@ -100,8 +102,18 @@ public class ImageServerLocation {
 
                 }
 
-                //Saving it to the database
+                //Finding the suggested Pedestrian:
                 PedestrianImage image = new PedestrianImage();
+                Iterator<Pedestrian> it  = Pedestrian.findAll(Pedestrian.class);
+                while (it.hasNext() && ImageServerLocation.this.otherSuggestion != null) {
+                        Pedestrian p = it.next();
+                        if(ImageServerLocation.this.otherSuggestion.equals(p.getName())){
+                            image.setSuggestion(p);
+                        }
+                    }
+
+                //Saving it to the database
+
                 image.setName(fileName.substring(0, fileName.lastIndexOf('.')));
                 image.setPath(context.getFilesDir().toString() + "/" + fileName);
                 image.save();

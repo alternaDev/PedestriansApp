@@ -11,6 +11,25 @@ public class PedestrianImage extends SugarRecord<PedestrianImage>{
     private boolean alreadyAnalyzed;
     private boolean noPedestrian;
     private Pedestrian pedestrian;
+    private Pedestrian suggestion;
+    private String status;
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Pedestrian getSuggestion() {
+        return suggestion;
+    }
+
+    public void setSuggestion(Pedestrian suggestion) {
+        this.suggestion = suggestion;
+    }
+
     private String path;
 
     public String getName() {
