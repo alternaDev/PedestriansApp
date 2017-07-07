@@ -1,7 +1,9 @@
 package org.alternadev.pedestrians.api;
 
+
 import java.util.List;
 
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
@@ -23,5 +25,5 @@ public interface PedestrianAPI {
 
     @Headers("Content-Type: application/json")
     @POST("results")
-    Call<String> sendResults(@Header("X-User") String user, @Body List<PedestrianResult> data);
+    Call<ResponseBody> sendResults(@Header("X-User") String user, @Body List<PedestrianResult> data);
 }

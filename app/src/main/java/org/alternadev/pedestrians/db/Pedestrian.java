@@ -6,7 +6,7 @@ import com.orm.SugarRecord;
  * Created by Julius on 28.06.2017.
  */
 
-public class Pedestrian extends SugarRecord<Pedestrian>{
+public class Pedestrian extends SugarRecord {
     public Pedestrian(){
 
     }

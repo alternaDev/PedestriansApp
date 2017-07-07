@@ -1,6 +1,7 @@
 package org.alternadev.pedestrians;
 
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
@@ -9,6 +10,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -26,36 +28,74 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.facebook.stetho.Stetho;
+import com.squareup.okhttp.internal.Platform;
+import com.squareup.otto.Subscribe;
 import com.squareup.picasso.Picasso;
 
+import org.alternadev.pedestrians.api.FetchReadyEvent;
 import org.alternadev.pedestrians.api.PedestrianAPIController;
+import org.alternadev.pedestrians.api.SendReadyEvent;
 import org.alternadev.pedestrians.db.Pedestrian;
 import org.alternadev.pedestrians.db.PedestrianImage;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
 
 import static com.orm.SugarRecord.find;
 import static com.orm.SugarRecord.findAll;
 
 public class MainActivity extends AppCompatActivity {
 
-    private ImageView imageView;
-    private FloatingActionButton delete;
-    private FloatingActionButton assign;
-    private FloatingActionButton skip;
+    @BindView(R.id.imageView2)
+    ImageView imageView;
+
+    @BindView(R.id.delete)
+    FloatingActionButton delete;
+
+    @BindView(R.id.assign)
+    FloatingActionButton assign;
+
+    @BindView(R.id.skip)
+    FloatingActionButton skip;
+
+    @BindView(R.id.spinner)
+    Spinner pedestrianNames;
+
+    @BindView(R.id.toolbar)
+    Toolbar toolbar;
+
+    @BindView(R.id.arriving)
+    RadioButton arriving;
+
+    @BindView(R.id.textView)
+    TextView noImages;
+
+    @BindView(R.id.radioGroup)
+    RadioGroup group;
+
+    @BindView(R.id.textView3)
+    TextView remaining;
 
     private ArrayList<PedestrianImage> images;
     private PedestrianImage current;
     private PedestrianAPIController controller;
-    private Spinner pedestrianNames;
 
     private ArrayList<String> names;
 
     public static String USER = "NONE";
     private boolean autoSelect;
+
+    ProgressDialog sendDialog;
+    ProgressDialog fetchDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,35 +104,17 @@ public class MainActivity extends AppCompatActivity {
         autoSelect = true;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+
+        ButterKnife.bind(this);
+
+        PedaApplication.BUS.register(this);
+
         setSupportActionBar(toolbar);
         Stetho.initializeWithDefaults(this);
 
-        images = new ArrayList<PedestrianImage>();
+        images = new ArrayList<>();
 
         controller = new PedestrianAPIController(this);
-
-
-        imageView = (ImageView) findViewById(R.id.imageView2);
-        delete = (FloatingActionButton) findViewById(R.id.delete);
-        assign = (FloatingActionButton) findViewById(R.id.assign);
-        skip = (FloatingActionButton) findViewById(R.id.skip);
-        pedestrianNames = (Spinner) findViewById(R.id.spinner);
-        final RadioButton arriving = (RadioButton) findViewById(R.id.arriving);
-
-        this.loadImages();
-        this.nextPicture();
-
-
-        names = new ArrayList<String>();
-        ArrayList<Pedestrian> p = this.findAllPedestrians();
-        for (Pedestrian pedestrian : p) {
-            names.add(pedestrian.getName());
-        }
-        names.add("Neue Person...");
-        final ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, names);
-        pedestrianNames.setAdapter(spinnerArrayAdapter);
-
 
         pedestrianNames.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -139,12 +161,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-        ArrayList<PedestrianImage> list = new ArrayList<PedestrianImage>();
-        Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
-        while (it.hasNext()) {
-            PedestrianImage ne = it.next();
-            list.add(ne);
-        }
         final SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
         String user = sharedPref.getString("USER", null);
         if (user == null) {
@@ -171,48 +187,55 @@ public class MainActivity extends AppCompatActivity {
             MainActivity.USER = user;
         }
 
+        loadData();
+    }
 
-        skip.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                MainActivity.this.skip();
-            }
-        });
+    void loadData() {
+        names = new ArrayList<>();
+        ArrayList<Pedestrian> p = this.findAllPedestrians();
+        for (Pedestrian pedestrian : p) {
+            names.add(pedestrian.getName());
+        }
+        Collections.sort(names);
+        names.add("Neue Person...");
+        final ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, names);
+        pedestrianNames.setAdapter(spinnerArrayAdapter);
 
-        delete.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                MainActivity.this.current.setNoPedestrian(true);
-                MainActivity.this.current.setAlreadyAnalyzed(true);
-                MainActivity.this.current.save();
-                MainActivity.this.nextPicture();
-            }
-        });
+        this.loadImages();
+        this.nextPicture();
+    }
 
-        assign.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(final View view) {
-                final PedestrianImage workingOn = MainActivity.this.current;
+    @OnClick(R.id.skip)
+    void onClickSkip() {
+        skip();
+    }
 
-                Pedestrian newPedestrian = new Pedestrian();
-                newPedestrian.setName(pedestrianNames.getSelectedItem().toString());
-                newPedestrian.save();
+    @OnClick(R.id.delete)
+    void onClickDelete() {
+        this.current.setNoPedestrian(true);
+        this.current.setAlreadyAnalyzed(true);
+        this.current.save();
+        this.nextPicture();
+    }
 
-                workingOn.setPedestrian(newPedestrian);
-                workingOn.setAlreadyAnalyzed(true);
+    @OnClick(R.id.assign)
+    void onClickAssign() {
+        final PedestrianImage workingOn = MainActivity.this.current;
 
-                if (arriving.isChecked())
-                    workingOn.setStatus("arriving");
-                else
-                    workingOn.setStatus("leaving");
-                workingOn.save();
+        Pedestrian newPedestrian = new Pedestrian();
+        newPedestrian.setName(pedestrianNames.getSelectedItem().toString());
+        newPedestrian.save();
 
-                MainActivity.this.nextPicture();
+        workingOn.setPedestrian(newPedestrian);
+        workingOn.setAlreadyAnalyzed(true);
 
-            }
+        if (arriving.isChecked())
+            workingOn.setStatus("arriving");
+        else
+            workingOn.setStatus("leaving");
+        workingOn.save();
 
-        });
-
+        this.nextPicture();
     }
 
     @Override
@@ -224,9 +247,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void nextPicture() {
         this.images.remove(current);
-        TextView noImages = (TextView) findViewById(R.id.textView);
-        RadioGroup group = (RadioGroup) findViewById(R.id.radioGroup);
-        TextView remaining = (TextView) findViewById(R.id.textView3);
+
         remaining.setText("Verbleibend:" + this.images.size());
         if (this.images.size() == 0) {
             this.imageView.setVisibility(View.INVISIBLE);
@@ -246,37 +267,31 @@ public class MainActivity extends AppCompatActivity {
             assign.setVisibility(View.VISIBLE);
             delete.setVisibility(View.VISIBLE);
 
-            this.current = this.images.get(0);
-            if (this.current.getSuggestion() != null) {
-                this.autoSelect = true;
-                this.pedestrianNames.setSelection(this.names.indexOf(this.current.getSuggestion().getName()));
-
-                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
-            } else {
-                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.background_light));
-            }
-            Picasso.with(this).load(current.getPath()).resize(800, 800)
-                    .centerInside().into(imageView);
+            nextPic();
 
 
         }
+    }
+
+    void nextPic() {
+        this.current = this.images.get(0);
+        if (this.current.getSuggestion() != null) {
+            this.autoSelect = true;
+            this.pedestrianNames.setSelection(this.names.indexOf(this.current.getSuggestion().getName()));
+
+            this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+        } else {
+            this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.background_light));
+        }
+        Picasso.with(this).load(current.getPath()).resize(800, 800)
+                .centerInside().noFade().into(imageView);
     }
 
     public void skip() {
         if (this.images.size() > 1) {
             this.images.remove(current);
             this.images.add(current);
-            this.current = this.images.get(0);
-            if (this.current.getSuggestion() != null) {
-                this.autoSelect = true;
-                this.pedestrianNames.setSelection(this.names.indexOf(this.current.getSuggestion().getName()));
-
-                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
-            } else {
-                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.background_light));
-            }
-            Picasso.with(this).load(current.getPath()).resize(800, 800)
-                    .centerInside().into(imageView);
+            nextPic();
         } else {
             Snackbar.make(this.imageView, "Keine andere Bilder vorhanden.", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show();
@@ -286,7 +301,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void loadImages() {
 
-        this.images = new ArrayList<PedestrianImage>();
+        this.images = new ArrayList<>();
         Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
         while (it.hasNext()) {
             PedestrianImage next = it.next();
@@ -294,6 +309,7 @@ public class MainActivity extends AppCompatActivity {
                 this.images.add(next);
         }
 
+        Collections.sort(this.images, PedestrianImage.DATE_COMPARATOR);
     }
 
     @Override
@@ -305,15 +321,11 @@ public class MainActivity extends AppCompatActivity {
 
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.fetch_data) {
-            Pedestrian.deleteAll(Pedestrian.class);
-            PedestrianImage.deleteAll(PedestrianImage.class);
-            controller.getNames();
-            controller.fetchImages();
-
-            return true;
-        } else if (id == R.id.send_data) {
+        if (id == R.id.send_data) {
+            sendDialog = ProgressDialog.show(this, "",
+                    "Sending Data. Please wait...", true);
             controller.sendResults();
+
             return true;
         }
 
@@ -329,5 +341,34 @@ public class MainActivity extends AppCompatActivity {
             all.add(it.next());
         }
         return all;
+    }
+
+    @Subscribe
+    public void fetchReady(FetchReadyEvent event) {
+        if(fetchDialog != null)
+            fetchDialog.hide();
+        if(event.isSuccess) {
+            this.loadData();
+        } else {
+            Toast.makeText(this, "Failed to fetch!", Toast.LENGTH_SHORT);
+        }
+    }
+
+    @Subscribe
+    public void sendReady(SendReadyEvent event) {
+        if(sendDialog != null)
+            sendDialog.hide();
+        if(event.isSuccess) {
+            Pedestrian.deleteAll(Pedestrian.class);
+            PedestrianImage.deleteAll(PedestrianImage.class);
+            controller.getNames();
+            controller.fetchImages();
+            fetchDialog = ProgressDialog.show(this, "",
+                    "Fetching Data. Please wait...", true);
+        } else {
+            Toast.makeText(this, "Failed to send!", Toast.LENGTH_SHORT);
+        }
+
+
     }
 }

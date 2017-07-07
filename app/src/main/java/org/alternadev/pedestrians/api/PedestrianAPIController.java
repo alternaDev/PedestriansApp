@@ -1,18 +1,24 @@
 package org.alternadev.pedestrians.api;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import org.alternadev.pedestrians.MainActivity;
+import org.alternadev.pedestrians.PedaApplication;
 import org.alternadev.pedestrians.db.Pedestrian;
 import org.alternadev.pedestrians.db.PedestrianImage;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import okhttp3.OkHttpClient;
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -47,20 +53,30 @@ public class PedestrianAPIController {
         controller.start();
     }
 
+    PedestrianAPI getAPI() {
+        final OkHttpClient okHttpClient = new OkHttpClient.Builder()
+                .readTimeout(10 * 60, TimeUnit.SECONDS)
+                .connectTimeout(60, TimeUnit.SECONDS)
+                .build();
+
+        final Gson gson = new GsonBuilder()
+                .setLenient()
+                .create();
+
+        final Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create(gson))
+                .client(okHttpClient)
+                .build();
+
+        return retrofit.create(PedestrianAPI.class);
+    }
+
     private class GetImagesController implements Callback<List<ImageServerLocation>> {
         public void start() {
-            Gson gson = new GsonBuilder()
-                    .setLenient()
-                    .create();
 
-            Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl(BASE_URL)
-                    .addConverterFactory(GsonConverterFactory.create(gson))
-                    .build();
 
-            PedestrianAPI pedestrianAPI = retrofit.create(PedestrianAPI.class);
-
-            Call<List<ImageServerLocation>> call = pedestrianAPI.getImages(MainActivity.USER);
+            Call<List<ImageServerLocation>> call = getAPI().getImages(MainActivity.USER);
             call.enqueue(this);
 
         }
@@ -73,9 +89,14 @@ public class PedestrianAPIController {
                     isl.persist(PedestrianAPIController.this.context);
                 }
 
+
             } else {
                 System.out.println(response.errorBody());
             }
+            FetchReadyEvent e = new FetchReadyEvent();
+            e.isSuccess = response.isSuccessful();
+            PedaApplication.BUS.post(e);
+
         }
 
         @Override
@@ -86,18 +107,8 @@ public class PedestrianAPIController {
 
     private class GetNamesController implements Callback<List<String>> {
         public void start() {
-            Gson gson = new GsonBuilder()
-                    .setLenient()
-                    .create();
 
-            Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl(BASE_URL)
-                    .addConverterFactory(GsonConverterFactory.create(gson))
-                    .build();
-
-            PedestrianAPI pedestrianAPI = retrofit.create(PedestrianAPI.class);
-
-            Call<List<String>> call = pedestrianAPI.getNames();
+            Call<List<String>> call = getAPI().getNames();
             call.enqueue(this);
 
         }
@@ -135,18 +146,9 @@ public class PedestrianAPIController {
         }
     }
 
-    private class SendResultsController implements Callback<String> {
+    private class SendResultsController implements Callback<ResponseBody> {
         public void start() {
-            Gson gson = new GsonBuilder()
-                    .setLenient()
-                    .create();
 
-            Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl(BASE_URL)
-                    .addConverterFactory(GsonConverterFactory.create(gson))
-                    .build();
-
-            PedestrianAPI pedestrianAPI = retrofit.create(PedestrianAPI.class);
 
             Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
             ArrayList<PedestrianImage> list = new ArrayList<PedestrianImage>();
@@ -166,25 +168,38 @@ public class PedestrianAPIController {
                     r.setRecognizedPedestrian(pi.getPedestrian().getName());
                 results.add(r);
             }
-            Call<String> call = pedestrianAPI.sendResults(MainActivity.USER, results);
+            Log.d("asd", "asd1");
+
+            Call<ResponseBody> call = getAPI().sendResults(MainActivity.USER, results);
             call.enqueue(this);
 
         }
 
         @Override
-        public void onResponse(Call<String> call, Response<String> response) {
+        public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+            Log.d("asd", "asd");
+            SendReadyEvent e = new SendReadyEvent();
             if (response.isSuccessful()) {
-                String resp = response.body();
+                String resp = null;
+                try {
+                    resp = response.body().string();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
                 System.out.println(resp);
-
             } else {
                 System.out.println(response.errorBody());
             }
+            e.isSuccess = response.isSuccessful();
+            PedaApplication.BUS.post(e);
         }
 
         @Override
-        public void onFailure(Call<String> call, Throwable t) {
-
+        public void onFailure(Call<ResponseBody> call, Throwable t) {
+            t.printStackTrace();
+            SendReadyEvent e = new SendReadyEvent();
+            e.isSuccess = false;
+            PedaApplication.BUS.post(e);
         }
     }
 }

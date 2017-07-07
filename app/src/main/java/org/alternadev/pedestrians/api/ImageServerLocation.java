@@ -10,6 +10,7 @@ import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 
 import org.alternadev.pedestrians.MainActivity;
+import org.alternadev.pedestrians.PedaApplication;
 import org.alternadev.pedestrians.db.Pedestrian;
 import org.alternadev.pedestrians.db.PedestrianImage;
 
@@ -26,7 +27,7 @@ import java.util.Iterator;
  * Created by Julius on 29.06.2017.
  */
 
-public class ImageServerLocation implements Callback{
+public class ImageServerLocation {
     String url;
     String otherSuggestion;
 
@@ -39,9 +40,11 @@ public class ImageServerLocation implements Callback{
     public void persist(final Context c) {
         this.c = c;
 
-        Picasso.with(c).load(url).fetch(this);
+        PedaApplication.JOB_MANAGER.addJobInBackground(new CacheImageJob(url));
+
         String fileName = url.substring(url.lastIndexOf('/') + 1, url.length());
         PedestrianImage image = new PedestrianImage();
+
         Iterator<Pedestrian> it = Pedestrian.findAll(Pedestrian.class);
         while (it.hasNext() && ImageServerLocation.this.otherSuggestion != null) {
             Pedestrian p = it.next();
@@ -57,15 +60,4 @@ public class ImageServerLocation implements Callback{
         image.save();
     }
 
-
-    @Override
-    public void onSuccess() {
-        ((MainActivity) c).loadImages();
-        ((MainActivity) c).nextPicture();
-    }
-
-    @Override
-    public void onError() {
-
-    }
 }
