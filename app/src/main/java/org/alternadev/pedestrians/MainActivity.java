@@ -17,13 +17,18 @@ import android.text.InputType;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.facebook.stetho.Stetho;
+import com.squareup.picasso.Picasso;
 
 import org.alternadev.pedestrians.api.PedestrianAPIController;
 import org.alternadev.pedestrians.db.Pedestrian;
@@ -32,6 +37,7 @@ import org.alternadev.pedestrians.db.PedestrianImage;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import static com.orm.SugarRecord.find;
 import static com.orm.SugarRecord.findAll;
 
 public class MainActivity extends AppCompatActivity {
@@ -44,12 +50,18 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<PedestrianImage> images;
     private PedestrianImage current;
     private PedestrianAPIController controller;
+    private Spinner pedestrianNames;
+
+    private ArrayList<String> names;
+
     public static String USER = "NONE";
+    private boolean autoSelect;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         //Pedestrian.deleteAll(Pedestrian.class);
         //PedestrianImage.deleteAll(PedestrianImage.class);
+        autoSelect = true;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -65,23 +77,81 @@ public class MainActivity extends AppCompatActivity {
         delete = (FloatingActionButton) findViewById(R.id.delete);
         assign = (FloatingActionButton) findViewById(R.id.assign);
         skip = (FloatingActionButton) findViewById(R.id.skip);
+        pedestrianNames = (Spinner) findViewById(R.id.spinner);
+        final RadioButton arriving = (RadioButton) findViewById(R.id.arriving);
 
         this.loadImages();
         this.nextPicture();
 
+
+        names = new ArrayList<String>();
+        ArrayList<Pedestrian> p = this.findAllPedestrians();
+        for (Pedestrian pedestrian : p) {
+            names.add(pedestrian.getName());
+        }
+        names.add("Neue Person...");
+        final ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, names);
+        pedestrianNames.setAdapter(spinnerArrayAdapter);
+
+
+        pedestrianNames.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+                if (!MainActivity.this.autoSelect && position == names.size() - 1) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    builder.setTitle("Neue Person benennen");
+
+
+                    final EditText input = new EditText(MainActivity.this);
+
+                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    builder.setView(input);
+
+
+                    builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            Pedestrian newPedestrian = new Pedestrian();
+                            newPedestrian.setName(input.getText().toString());
+                            newPedestrian.save();
+                            names.add(0, newPedestrian.getName());
+                            pedestrianNames.setSelection(0);
+                        }
+                    });
+                    builder.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.cancel();
+                        }
+                    });
+
+                    builder.show();
+
+                }
+                MainActivity.this.autoSelect = false;
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+
         ArrayList<PedestrianImage> list = new ArrayList<PedestrianImage>();
         Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
-        while(it.hasNext()){
+        while (it.hasNext()) {
             PedestrianImage ne = it.next();
             list.add(ne);
         }
         final SharedPreferences sharedPref = this.getPreferences(Context.MODE_PRIVATE);
         String user = sharedPref.getString("USER", null);
         if (user == null) {
-            CharSequence names[] = {"Jean", "Julius"};
+            CharSequence userNames[] = {"Jean", "Julius"};
             AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
             builder.setTitle("Jean oder Christian?");
-            builder.setItems(names, new DialogInterface.OnClickListener() {
+            builder.setItems(userNames, new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     SharedPreferences.Editor editor = sharedPref.edit();
@@ -102,8 +172,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        skip.setOnClickListener(new View.OnClickListener(){
-
+        skip.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 MainActivity.this.skip();
@@ -117,9 +186,6 @@ public class MainActivity extends AppCompatActivity {
                 MainActivity.this.current.setAlreadyAnalyzed(true);
                 MainActivity.this.current.save();
                 MainActivity.this.nextPicture();
-                Snackbar.make(view, "Kein Passant erkannt.", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-                MainActivity.this.nextPicture();
             }
         });
 
@@ -127,125 +193,26 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(final View view) {
                 final PedestrianImage workingOn = MainActivity.this.current;
-                Iterator<Pedestrian> it = findAll(Pedestrian.class);
 
-                final ArrayList<Pedestrian> all = new ArrayList<Pedestrian>();
+                Pedestrian newPedestrian = new Pedestrian();
+                newPedestrian.setName(pedestrianNames.getSelectedItem().toString());
+                newPedestrian.save();
 
-                while (it.hasNext()) {
-                    all.add(it.next());
-                }
+                workingOn.setPedestrian(newPedestrian);
+                workingOn.setAlreadyAnalyzed(true);
 
-                CharSequence names[] = new CharSequence[all.size() + 1];
+                if (arriving.isChecked())
+                    workingOn.setStatus("arriving");
+                else
+                    workingOn.setStatus("leaving");
+                workingOn.save();
 
-                for (int i = 0; i < all.size(); i++) {
-                    names[i] = all.get(i).getName();
-                }
-                names[all.size()] = "Neue Person...";
-                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                builder.setTitle("Wer ist das?");
-                builder.setItems(names, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-
-                        if (which == all.size()) {
-                            AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                            builder.setTitle("Neue Person hinzufügen:");
-
-                            // Set up the input
-                            final EditText input = new EditText(MainActivity.this);
-                            // Specify the type of input expected
-                            input.setInputType(InputType.TYPE_CLASS_TEXT);
-                            builder.setView(input);
-
-                            // Set up the buttons
-                            builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    Pedestrian newPedestrian = new Pedestrian();
-                                    newPedestrian.setName(input.getText().toString());
-                                    newPedestrian.save();
-
-                                    workingOn.setPedestrian(newPedestrian);
-                                    workingOn.setAlreadyAnalyzed(true);
-
-                                    AlertDialog.Builder builder2 = new AlertDialog.Builder(MainActivity.this);
-                                    builder2.setTitle("");
-                                    View layout = View.inflate(MainActivity.this,R.layout.select_state, null);
-                                    builder2.setView(layout);
-                                    final RadioButton coming = (RadioButton) layout.findViewById(R.id.radioButton);
-
-                                    builder2.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                                        @Override
-                                        public void onClick(DialogInterface dialog, int which) {
-                                            if(coming.isChecked())
-                                                workingOn.setStatus("leaving");
-                                            else
-                                                workingOn.setStatus("arriving");
-                                            workingOn.save();
-                                            MainActivity.this.nextPicture();
-                                        }
-                                    });
-                                    builder2.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-                                        @Override
-                                        public void onClick(DialogInterface dialog, int which) {
-                                            dialog.cancel();
-                                        }
-                                    });
-
-                                    builder2.show();
-
-                                }
-                            });
-                            builder.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    dialog.cancel();
-                                }
-                            });
-
-                            builder.show();
-                        } else {
-                            Pedestrian selected = all.get(which);
-                            workingOn.setPedestrian(selected);
-                            workingOn.setAlreadyAnalyzed(true);
-
-                            AlertDialog.Builder builder2 = new AlertDialog.Builder(MainActivity.this);
-                            builder2.setTitle("");
-                            View layout = View.inflate(MainActivity.this,R.layout.select_state, null);
-                            builder2.setView(layout);
-                            final RadioButton coming = (RadioButton) layout.findViewById(R.id.radioButton);
-
-                            builder2.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    if(coming.isChecked())
-                                        workingOn.setStatus("leaving");
-                                    else
-                                        workingOn.setStatus("arriving");
-                                    workingOn.save();
-                                    MainActivity.this.nextPicture();
-                                }
-                            });
-                            builder2.setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    dialog.cancel();
-                                }
-                            });
-                            builder2.show();
-
-
-                        }
-
-
-
-                    }
-                });
-                builder.show();
+                MainActivity.this.nextPicture();
 
             }
 
         });
+
     }
 
     @Override
@@ -258,69 +225,64 @@ public class MainActivity extends AppCompatActivity {
     public void nextPicture() {
         this.images.remove(current);
         TextView noImages = (TextView) findViewById(R.id.textView);
-        TextView suggestion = (TextView) findViewById(R.id.suggestion);
+        RadioGroup group = (RadioGroup) findViewById(R.id.radioGroup);
+        TextView remaining = (TextView) findViewById(R.id.textView3);
+        remaining.setText("Verbleibend:" + this.images.size());
         if (this.images.size() == 0) {
             this.imageView.setVisibility(View.INVISIBLE);
             noImages.setVisibility(View.VISIBLE);
             assign.setVisibility(View.INVISIBLE);
             delete.setVisibility(View.INVISIBLE);
-            suggestion.setVisibility(View.INVISIBLE);
+            pedestrianNames.setVisibility(View.INVISIBLE);
+            group.setVisibility(View.INVISIBLE);
             skip.setVisibility(View.INVISIBLE);
 
         } else {
             skip.setVisibility(View.VISIBLE);
-            suggestion.setVisibility(View.VISIBLE);
+            pedestrianNames.setVisibility(View.VISIBLE);
+            group.setVisibility(View.VISIBLE);
             noImages.setVisibility(View.INVISIBLE);
             this.imageView.setVisibility(View.VISIBLE);
             assign.setVisibility(View.VISIBLE);
             delete.setVisibility(View.VISIBLE);
 
             this.current = this.images.get(0);
-            if(this.current.getSuggestion() != null)
-                suggestion.setText("Ist das möglicherweise "+this.current.getSuggestion().getName() +"?");
-            else
-                suggestion.setText("Kein Vorschlag vorhanden.");
-            imageView.setImageDrawable( getDrawableFromPath(current.getPath()));
+            if (this.current.getSuggestion() != null) {
+                this.autoSelect = true;
+                this.pedestrianNames.setSelection(this.names.indexOf(this.current.getSuggestion().getName()));
+
+                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+            } else {
+                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.background_light));
+            }
+            Picasso.with(this).load(current.getPath()).resize(800, 800)
+                    .centerInside().into(imageView);
 
 
         }
     }
 
-    public void skip(){
-        if(this.images.size() > 1) {
+    public void skip() {
+        if (this.images.size() > 1) {
             this.images.remove(current);
             this.images.add(current);
             this.current = this.images.get(0);
-            this.imageView.setImageDrawable(getDrawableFromPath(current.getPath()));
+            if (this.current.getSuggestion() != null) {
+                this.autoSelect = true;
+                this.pedestrianNames.setSelection(this.names.indexOf(this.current.getSuggestion().getName()));
+
+                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+            } else {
+                this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.background_light));
+            }
+            Picasso.with(this).load(current.getPath()).resize(800, 800)
+                    .centerInside().into(imageView);
         } else {
             Snackbar.make(this.imageView, "Keine andere Bilder vorhanden.", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show();
         }
     }
 
-    private Drawable getDrawableFromPath(String path) {
-        Bitmap bmImg = BitmapFactory.decodeFile(path);
-        Drawable result = new BitmapDrawable(getApplicationContext().getResources(), bmImg);
-        return scaleImage(result,2f);
-    }
-    private Drawable scaleImage (Drawable image, float scaleFactor) {
-
-        if ((image == null) || !(image instanceof BitmapDrawable)) {
-            return image;
-        }
-
-        Bitmap b = ((BitmapDrawable)image).getBitmap();
-
-        int sizeX = Math.round(image.getIntrinsicWidth() * scaleFactor);
-        int sizeY = Math.round(image.getIntrinsicHeight() * scaleFactor);
-
-        Bitmap bitmapResized = Bitmap.createScaledBitmap(b, sizeX, sizeY, false);
-
-        image = new BitmapDrawable(getResources(), bitmapResized);
-
-        return image;
-
-    }
 
     public void loadImages() {
 
@@ -356,5 +318,16 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private ArrayList<Pedestrian> findAllPedestrians() {
+        Iterator<Pedestrian> it = findAll(Pedestrian.class);
+
+        final ArrayList<Pedestrian> all = new ArrayList<Pedestrian>();
+
+        while (it.hasNext()) {
+            all.add(it.next());
+        }
+        return all;
     }
 }
