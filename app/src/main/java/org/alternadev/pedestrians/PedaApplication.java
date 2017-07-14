@@ -32,7 +32,9 @@ public class PedaApplication extends SugarApp {
         SugarContext.getSugarContext().getSugarDb().getDB(); // We have to call this to circumvent the stupid, non working lazy loading of sugarorm. thank your for nothing.
         super.onCreate();
         Log.d("ja", "moin");
-        JOB_MANAGER = new JobManager(new Configuration.Builder(this).build());
+        JOB_MANAGER = new JobManager(new Configuration.Builder(this).maxConsumerCount(2).build());
+        PedaApplication.JOB_MANAGER.stop();
+
     }
 
     @Override

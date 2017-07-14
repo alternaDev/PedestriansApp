@@ -39,7 +39,6 @@ public class ImageServerLocation {
 
     public void persist(final Context c) {
         this.c = c;
-
         PedaApplication.JOB_MANAGER.addJobInBackground(new CacheImageJob(url));
 
         String fileName = url.substring(url.lastIndexOf('/') + 1, url.length());

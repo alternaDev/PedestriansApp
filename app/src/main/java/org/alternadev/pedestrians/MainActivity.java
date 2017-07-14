@@ -33,6 +33,8 @@ import android.widget.Toast;
 import com.facebook.stetho.Stetho;
 import com.squareup.okhttp.internal.Platform;
 import com.squareup.otto.Subscribe;
+import com.squareup.picasso.Callback;
+import com.squareup.picasso.NetworkPolicy;
 import com.squareup.picasso.Picasso;
 
 import org.alternadev.pedestrians.api.FetchReadyEvent;
@@ -44,7 +46,9 @@ import org.alternadev.pedestrians.db.PedestrianImage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -188,6 +192,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         loadData();
+        PedaApplication.JOB_MANAGER.start();
+
     }
 
     void loadData() {
@@ -196,8 +202,16 @@ public class MainActivity extends AppCompatActivity {
         for (Pedestrian pedestrian : p) {
             names.add(pedestrian.getName());
         }
+
+        // remove duplicates. dirty but twerty.
+        Set<String> hs = new HashSet<>();
+        hs.addAll(names);
+        names.clear();
+        names.addAll(hs);
+
         Collections.sort(names);
         names.add("Neue Person...");
+
         final ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, names);
         pedestrianNames.setAdapter(spinnerArrayAdapter);
 
@@ -233,7 +247,13 @@ public class MainActivity extends AppCompatActivity {
             workingOn.setStatus("arriving");
         else
             workingOn.setStatus("leaving");
-        workingOn.save();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                workingOn.save();
+            }
+        }).start();
+
 
         this.nextPicture();
     }
@@ -283,8 +303,24 @@ public class MainActivity extends AppCompatActivity {
         } else {
             this.pedestrianNames.setBackgroundColor(getResources().getColor(android.R.color.background_light));
         }
-        Picasso.with(this).load(current.getPath()).resize(800, 800)
-                .centerInside().noFade().into(imageView);
+
+        Picasso.with(this)
+                .load(current.getPath())
+                .networkPolicy(NetworkPolicy.OFFLINE)
+                .resize(800, 800)
+                .centerInside().noFade().into(imageView, new Callback() {
+                    @Override
+                    public void onSuccess() {
+
+                    }
+
+                    @Override
+                    public void onError() {
+                        // Try again online if cache failed
+                        Picasso.with(MainActivity.this).load(current.getPath()).resize(800, 800)
+                                .centerInside().noFade().into(imageView);
+                    }
+                });
     }
 
     public void skip() {
@@ -322,6 +358,8 @@ public class MainActivity extends AppCompatActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.send_data) {
+            PedaApplication.JOB_MANAGER.stop();
+
             sendDialog = ProgressDialog.show(this, "",
                     "Sending Data. Please wait...", true);
             controller.sendResults();
@@ -351,6 +389,8 @@ public class MainActivity extends AppCompatActivity {
             this.loadData();
         } else {
             Toast.makeText(this, "Failed to fetch!", Toast.LENGTH_SHORT);
+            PedaApplication.JOB_MANAGER.start();
+
         }
     }
 
@@ -368,6 +408,8 @@ public class MainActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, "Failed to send!", Toast.LENGTH_SHORT);
         }
+        PedaApplication.JOB_MANAGER.start();
+
 
 
     }

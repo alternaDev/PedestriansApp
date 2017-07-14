@@ -3,8 +3,11 @@ package org.alternadev.pedestrians.api;
 import android.content.Context;
 import android.util.Log;
 
+import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.orm.SugarContext;
+import com.orm.SugarTransactionHelper;
 
 import org.alternadev.pedestrians.MainActivity;
 import org.alternadev.pedestrians.PedaApplication;
@@ -84,10 +87,24 @@ public class PedestrianAPIController {
         @Override
         public void onResponse(Call<List<ImageServerLocation>> call, Response<List<ImageServerLocation>> response) {
             if (response.isSuccessful()) {
+                // Wait with downloading of images to give time for persitsting of persons.
+                PedaApplication.JOB_MANAGER.stop();
+
                 List<ImageServerLocation> images = response.body();
-                for (ImageServerLocation isl : images) {
-                    isl.persist(PedestrianAPIController.this.context);
-                }
+
+                for(final List<ImageServerLocation> i : Lists.partition(images, 300))
+                    SugarTransactionHelper.doInTransaction(new SugarTransactionHelper.Callback() {
+                        @Override
+                        public void manipulateInTransaction() {
+                            for (ImageServerLocation isl : i) {
+                                isl.persist(PedestrianAPIController.this.context);
+                            }
+                        }
+                    });
+
+
+                PedaApplication.JOB_MANAGER.start();
+
 
 
             } else {
@@ -149,29 +166,35 @@ public class PedestrianAPIController {
     private class SendResultsController implements Callback<ResponseBody> {
         public void start() {
 
+            // TODO: Make this async!
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
+                    ArrayList<PedestrianImage> list = new ArrayList<PedestrianImage>();
+                    while(it.hasNext()){
+                        PedestrianImage i = it.next();
+                        if(i.isAlreadyAnalyzed())
+                            list.add(i);
+                    }
+                    ArrayList<PedestrianResult> results = new ArrayList<PedestrianResult>();
+                    for (PedestrianImage pi : list) {
+                        PedestrianResult r = new PedestrianResult();
+                        String fileName = pi.getPath().substring(pi.getPath().lastIndexOf('/')+1, pi.getPath().length() );
+                        r.setFileName(fileName);
+                        r.setPedestrian(!pi.isNoPedestrian());
+                        r.setStatus(pi.getStatus());
+                        if(pi.getPedestrian() != null)
+                            r.setRecognizedPedestrian(pi.getPedestrian().getName());
+                        results.add(r);
+                    }
+                    Log.d("asd", "asd1");
 
-            Iterator<PedestrianImage> it = PedestrianImage.findAll(PedestrianImage.class);
-            ArrayList<PedestrianImage> list = new ArrayList<PedestrianImage>();
-            while(it.hasNext()){
-                PedestrianImage i = it.next();
-                if(i.isAlreadyAnalyzed())
-                    list.add(i);
-            }
-            ArrayList<PedestrianResult> results = new ArrayList<PedestrianResult>();
-            for (PedestrianImage pi : list) {
-                PedestrianResult r = new PedestrianResult();
-                String fileName = pi.getPath().substring(pi.getPath().lastIndexOf('/')+1, pi.getPath().length() );
-                r.setFileName(fileName);
-                r.setPedestrian(!pi.isNoPedestrian());
-                r.setStatus(pi.getStatus());
-                if(pi.getPedestrian() != null)
-                    r.setRecognizedPedestrian(pi.getPedestrian().getName());
-                results.add(r);
-            }
-            Log.d("asd", "asd1");
+                    Call<ResponseBody> call = getAPI().sendResults(MainActivity.USER, results);
+                    call.enqueue(SendResultsController.this);
+                }
+            });
 
-            Call<ResponseBody> call = getAPI().sendResults(MainActivity.USER, results);
-            call.enqueue(this);
 
         }
 
